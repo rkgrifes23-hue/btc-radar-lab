@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1424">
+  <title>BTC Radar | Laboratório v0.1</title>
+  <style>
+    :root { color-scheme:dark; --bg:#0b1424; --panel:#142238; --panel2:#1b2d46; --border:#2b405a; --text:#edf5ff; --muted:#a6bbd0; --green:#44d6a4; --red:#fb7b82; --blue:#75baff; --gold:#e8c986; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:15px/1.48 system-ui,-apple-system,"Segoe UI",Arial,sans-serif; background:radial-gradient(circle at 85% -10%,#203657,transparent 36%),var(--bg); color:var(--text); }
+    .wrap { max-width:1120px; margin:auto; padding:22px 18px 50px; }
+    .top { display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; margin-bottom:23px; }
+    .eyebrow { margin:0 0 4px; letter-spacing:.19em; text-transform:uppercase; font-size:11px; color:var(--blue); font-weight:700; }
+    h1 { margin:0; font-weight:760; letter-spacing:-.035em; font-size:clamp(26px,4vw,39px); }
+    h2 { margin:0 0 4px; font-size:17px; letter-spacing:-.018em; }
+    p { margin:0; }
+    .sub, .muted { color:var(--muted); }
+    .header-note { font-size:13px; }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid var(--border); background:var(--panel); border-radius:999px; font-size:12px; font-weight:700; }
+    .dot { display:inline-block; width:8px; height:8px; border-radius:100px; background:var(--gold); }
+    .pill.live .dot { background:var(--green); box-shadow:0 0 0 4px #44d6a41c; }
+    .pill.bad .dot { background:var(--red); }
+    .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:12px; }
+    .metric,.panel { background:linear-gradient(180deg,#17273e,var(--panel)); border:1px solid var(--border); border-radius:17px; }
+    .metric { padding:16px; min-height:117px; }
+    .label { color:var(--muted); letter-spacing:.02em; font-size:12px; font-weight:650; }
+    .value { font-size:clamp(21px,3vw,30px); font-weight:780; letter-spacing:-.03em; font-variant-numeric:tabular-nums; margin:9px 0 2px; overflow-wrap:anywhere; }
+    .foot { color:var(--muted); font-size:12px; }
+    .panel { padding:19px; margin:12px 0; }
+    .panel-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; margin-bottom:12px; }
+    .tag { background:#2a3b52; color:#d7e7ff; font-size:11px; border-radius:6px; padding:4px 8px; }
+    .chart-holder { width:100%; height:350px; position:relative; }
+    canvas { display:block; width:100%; height:100%; touch-action:pan-y; }
+    .row { display:flex; align-items:center; flex-wrap:wrap; gap:9px; }
+    button { background:#293e5c; border:1px solid #405b7c; border-radius:10px; padding:10px 13px; color:#f5f8ff; font:inherit; font-weight:700; cursor:pointer; }
+    button:hover { background:#335277; }
+    button.primary { background:#2463a5; border-color:#498ed5; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    button:focus-visible { outline:3px solid var(--blue); outline-offset:2px; }
+    .details { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .signal { font-size:22px; font-weight:750; color:var(--gold); margin:8px 0; }
+    .alert { border-left:3px solid var(--gold); padding:9px 13px; background:#d7a84d12; border-radius:0 8px 8px 0; color:#e7d2a0; font-size:13px; }
+    .small { font-size:13px; }
+    dl { display:grid; grid-template-columns:1fr auto; gap:6px 12px; margin:12px 0 0; font-size:13px; }
+    dt { color:var(--muted); }
+    dd { margin:0; text-align:right; font-weight:650; }
+    .log { padding:0; margin:8px 0 0; list-style:none; max-height:190px; overflow-y:auto; }
+    .log li { padding:7px 0; border-bottom:1px solid #29405a; font-size:12px; color:var(--muted); overflow-wrap:anywhere; }
+    .log li:last-child { border:0; }
+    .bottom { color:var(--muted); font-size:12px; margin-top:18px; }
+    #checkResult { color:var(--muted); min-height:20px; padding-top:8px; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    @media(max-width:730px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .details { grid-template-columns:1fr; } .metric { min-height:100px; padding:13px; } .panel { padding:15px; } .chart-holder { height:290px; } .wrap { padding:16px 12px 35px; } }
+    @media(max-width:360px) { .value { font-size:20px; } .label { font-size:11px; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div>
+        <p class="eyebrow">Laboratório de mercado • versão 0.1</p>
+        <h1>BTC <span style="color:var(--blue)">RADAR</span></h1>
+        <p class="sub header-note">Pesquisa de sinais antecipados • somente observação</p>
+      </div>
+      <div id="status" class="pill" role="status" aria-live="polite"><span class="dot"></span><span id="statusLabel">Inicializando…</span></div>
+    </header>
+
+    <section class="grid" aria-label="Resumo de mercado">
+      <article class="metric"><div class="label">BTC/USDT • último preço Spot</div><div class="value" id="price">—</div><div class="foot">Fonte: Binance Spot</div></article>
+      <article class="metric"><div class="label">Última mensagem de mercado</div><div class="value" id="lastUpdate">—</div><div class="foot" id="lastUpdateDetail">Aguardando dados</div></article>
+      <article class="metric"><div class="label">Candles de 1 minuto</div><div class="value" id="count">0</div><div class="foot" id="countDetail">Histórico ainda não carregado</div></article>
+      <article class="metric"><div class="label">Idade da mensagem ao vivo</div><div class="value" id="latency">—</div><div class="foot">Tempo desde a última atualização recebida</div></article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Movimentação de preço</h2><p class="muted small">Candles Binance Spot • intervalo de 1 minuto • volume em BTC</p></div>
+        <span class="tag">Exibição: últimos 80 candles</span>
+      </div>
+      <div class="chart-holder"><canvas id="chart" aria-label="Gráfico de candles BTC USDT de 1 minuto" role="img"></canvas></div>
+      <div class="row" style="margin-top:13px">
+        <button id="toggle" class="primary" type="button">Pausar conexão</button>
+        <button id="refresh" type="button">Atualizar histórico</button>
+        <button id="export" type="button" disabled>Baixar candles CSV</button>
+        <button id="check" type="button">Executar autoteste</button>
+      </div>
+      <div id="checkResult" class="small" aria-live="polite"></div>
+    </section>
+
+    <section class="details">
+      <article class="panel" style="margin:0">
+        <h2>Situação do motor de sinais</h2>
+        <div class="signal">SEM ENTRADA</div>
+        <p class="alert">Os sinais CALL e PUT estão intencionalmente desativados nesta versão. Ainda não foi implementado nem validado nenhum algoritmo de previsão.</p>
+        <dl>
+          <dt>Tipo de sinal</dt><dd>Não habilitado</dd>
+          <dt>Horizonte previsto</dt><dd>1, 2, 3 e 5 minutos (futuro)</dd>
+          <dt>Confiança estatística</dt><dd>Não calculada</dd>
+          <dt>Histórico de sinais</dt><dd>Não disponível</dd>
+          <dt>Execução de ordens</dt><dd>Desativada</dd>
+        </dl>
+      </article>
+      <article class="panel" style="margin:0">
+        <h2>Diagnóstico da conexão</h2>
+        <p class="muted small">Se a atualização parar, não considere o preço como tempo real. Recarregue o histórico ou verifique a rede.</p>
+        <dl>
+          <dt>Mercado</dt><dd>Binance Spot</dd>
+          <dt>Par</dt><dd>BTCUSDT</dd>
+          <dt>REST</dt><dd id="restStatus">Pendente</dd>
+          <dt>WebSocket</dt><dd id="wsStatus">Pendente</dd>
+          <dt>Horário exibido</dt><dd id="timezone">Local do aparelho</dd>
+        </dl>
+        <ul id="events" class="log" aria-live="polite"></ul>
+      </article>
+    </section>
+    <p class="bottom">Protótipo de monitoramento. Preço Spot não é cotação de uma plataforma de opções nem garantia de execução. Sem previsões, sem operações automáticas e sem armazenamento permanente dos candles; use o CSV para guardar uma cópia. Pode haver restrições regionais ou de rede ao acesso à API.</p>
+  </main>
+<script>
+'use strict';
+const SYMBOL='BTCUSDT', MINUTE=60000, MAX_CANDLES=240;
+const REST='https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=240';
+const STREAM='wss://data-stream.binance.vision:443/ws/btcusdt@kline_1m';
+const $=id=>document.getElementById(id);
+const fmtPrice=new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtTime=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const fmtShort=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit'});
+let candles=[], socket=null, desired=true, reconnectTimer=null, retry=0, lastMessageAt=0, lastExchangeEventAt=0, recentRestAt=0, connectionGeneration=0;
+const events=[];
+function validNumber(x) { const v=Number(x); return Number.isFinite(v) ? v : NaN; }
+function validCandle(c) {
+  return Number.isSafeInteger(c.t) && c.t>=0 && c.t%MINUTE===0 &&
+    [c.o,c.h,c.l,c.c,c.v,c.q].every(Number.isFinite) &&
+    c.o>0 && c.h>0 && c.l>0 && c.c>0 && c.v>=0 && c.q>=0 &&
+    c.l<=Math.min(c.o,c.c) && c.h>=Math.max(c.o,c.c) && c.h>=c.l;
+}
+function normalizeRest(row, now=Date.now()) {
+  if (!Array.isArray(row) || row.length<8) throw Error('Linha REST malformada');
+  const c={t:validNumber(row[0]),o:validNumber(row[1]),h:validNumber(row[2]),l:validNumber(row[3]),c:validNumber(row[4]),v:validNumber(row[5]),q:validNumber(row[7]),closed:Number(row[6])<now-1500,source:'REST',eventAt:0,seenAt:now};
+  if (!validCandle(c)) throw Error('Candle REST inválido');
+  return c;
+}
+function normalizeWs(event, now=Date.now()) {
+  const k=event && event.k;
+  if (!k || event.e!=='kline' || event.s!==SYMBOL || k.i!=='1m') throw Error('Mensagem WebSocket inesperada');
+  const c={t:validNumber(k.t),o:validNumber(k.o),h:validNumber(k.h),l:validNumber(k.l),c:validNumber(k.c),v:validNumber(k.v),q:validNumber(k.q),closed:k.x===true,source:'WS',eventAt:validNumber(event.E),seenAt:now};
+  if (!validCandle(c) || !Number.isFinite(c.eventAt) || c.eventAt<=0) throw Error('Candle WebSocket inválido');
+  return c;
+}
+function addCandle(c) {
+  const i=candles.findIndex(x=>x.t===c.t);
+  if (i>=0) {
+    const old=candles[i];
+    // Nunca substituir atualização WebSocket mais recente por snapshot REST potencialmente antigo.
+    if (old.source==='WS' && c.source==='REST') return false;
+    if (old.source==='WS' && c.source==='WS' && c.eventAt<old.eventAt) return false;
+    if (old.closed && !c.closed) return false;
+    candles[i]=c;
+  } else candles.push(c);
+  candles.sort((a,b)=>a.t-b.t);
+  if (candles.length>MAX_CANDLES) candles=candles.slice(-MAX_CANDLES);
+  return true;
+}
+function log(message) {
+  const when=fmtTime.format(new Date());
+  events.unshift(when+' · '+message);
+  if (events.length>7) events.pop();
+  $('events').replaceChildren(...events.map(t=>{const li=document.createElement('li');li.textContent=t;return li;}));
+}
+function setStatus(label,type='') {
+  $('statusLabel').textContent=label;
+  $('status').className='pill '+type;
+}
+function updateValues() {
+  const last=candles[candles.length-1];
+  $('count').textContent=String(candles.length);
+  $('export').disabled=!candles.length;
+  $('countDetail').textContent=candles.length ? 'Período até '+fmtShort.format(new Date(last.t)) : 'Histórico ainda não carregado';
+  $('price').textContent=last ? fmtPrice.format(last.c) : '—';
+  $('lastUpdate').textContent=lastMessageAt ? fmtTime.format(new Date(lastExchangeEventAt||lastMessageAt)) : (recentRestAt ? fmtTime.format(new Date(recentRestAt)):'—');
+  $('lastUpdateDetail').textContent=lastMessageAt ? 'Horário do evento da bolsa' : (recentRestAt ? 'Carregamento REST, não é transmissão ao vivo':'Aguardando dados');
+  const age=lastMessageAt?Math.max(0,Math.floor((Date.now()-lastMessageAt)/1000)):null;
+  $('latency').textContent=age===null?'—':age+' s';
+  const alive=desired && socket && socket.readyState===WebSocket.OPEN;
+  if (!desired) setStatus('Conexão pausada','bad');
+  else if (alive && age!==null && age<=12) setStatus('Dados ao vivo','live');
+  else if (alive) setStatus('Aguardando dados atuais','');
+  else if (candles.length) setStatus('Somente histórico • não ao vivo','bad');
+  else setStatus('Conectando ao mercado','');
+}
+async function fetchHistory() {
+  $('restStatus').textContent='Carregando…';
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),12000);
+  try {
+    const res=await fetch(REST,{signal:controller.signal,cache:'no-store'});
+    if (!res.ok) throw Error('HTTP '+res.status);
+    const rows=await res.json();
+    if (!Array.isArray(rows) || rows.length===0) throw Error('Resposta de candles vazia');
+    const parsed=rows.map(row=>normalizeRest(row));
+    for (const c of parsed) addCandle(c);
+    recentRestAt=Date.now();
+    $('restStatus').textContent='OK · '+parsed.length+' candles';
+    log('Histórico REST: '+parsed.length+' candles recebidos');
+    render();
+    return true;
+  } catch(err) {
+    $('restStatus').textContent='Erro / indisponível';
+    log('REST indisponível: '+(err.name==='AbortError'?'tempo excedido':err.message));
+    updateValues();
+    return false;
+  } finally { clearTimeout(timeout); }
+}
+function connectSocket() {
+  if (!desired) return;
+  const generation=++connectionGeneration;
+  $('wsStatus').textContent='Conectando…';
+  let ws;
+  try { ws=new WebSocket(STREAM); } catch(err) { log('Não foi possível iniciar WebSocket: '+err.message); scheduleReconnect(); return; }
+  socket=ws;
+  ws.onopen=()=>{
+    if (generation!==connectionGeneration || !desired) { ws.close(); return; }
+    retry=0;
+    $('wsStatus').textContent='Conectado';
+    log('WebSocket conectado; reconciliando histórico');
+    updateValues();
+    // Recarrega candles depois de reconectar para recuperar possíveis lacunas.
+    fetchHistory();
+  };
+  ws.onmessage=(msg)=>{
+    if (generation!==connectionGeneration || !desired) return;
+    try {
+      const event=JSON.parse(msg.data);
+      if (event.e!=='kline') return;
+      const c=normalizeWs(event);
+      if (addCandle(c)) {
+        lastMessageAt=Date.now();
+        lastExchangeEventAt=c.eventAt;
+        render();
+      }
+    } catch(err) { log('Mensagem ignorada: '+err.message); }
+  };
+  ws.onerror=()=>{ if (generation===connectionGeneration) $('wsStatus').textContent='Erro de rede'; };
+  ws.onclose=()=>{
+    if (generation!==connectionGeneration) return;
+    socket=null;
+    $('wsStatus').textContent=desired?'Desconectado':'Pausado';
+    if (desired) { log('WebSocket desconectado'); scheduleReconnect(); }
+    updateValues();
+  };
+}
+function scheduleReconnect() {
+  if (!desired || reconnectTimer) return;
+  const delay=Math.min(30000,2000*Math.pow(2,Math.min(retry++,4)));
+  log('Nova tentativa em '+(delay/1000)+' s');
+  reconnectTimer=setTimeout(()=>{ reconnectTimer=null; connectSocket(); },delay);
+}
+function start() {
+  desired=true;
+  $('toggle').textContent='Pausar conexão';
+  updateValues();
+  connectSocket();
+  if (!candles.length) fetchHistory();
+}
+function stop() {
+  desired=false;
+  connectionGeneration++;
+  if (reconnectTimer) {clearTimeout(reconnectTimer);reconnectTimer=null;}
+  if (socket) { const old=socket;socket=null;old.close(); }
+  $('toggle').textContent='Conectar';
+  $('wsStatus').textContent='Pausado';
+  log('Conexão pausada manualmente');
+  updateValues();
+}
+function drawChart() {
+  const canvas=$('chart'), parent=canvas.parentElement;
+  const w=Math.max(250,parent.clientWidth),h=Math.max(220,parent.clientHeight),dpr=Math.min(window.devicePixelRatio||1,3);
+  canvas.width=Math.floor(w*dpr);canvas.height=Math.floor(h*dpr);
+  const ctx=canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  const padL=8,padR=72,padT=24,priceBottom=Math.round(h*.73),volTop=Math.round(h*.79),volBottom=h-24;
+  const cs=candles.slice(-80);
+  if (!cs.length) { ctx.fillStyle='#a6bbd0';ctx.font='14px system-ui';ctx.textAlign='center';ctx.fillText('Aguardando dados de mercado…',w/2,h/2);return; }
+  const lo=Math.min(...cs.map(x=>x.l)),hi=Math.max(...cs.map(x=>x.h));
+  const margin=Math.max((hi-lo)*.08,hi*.00002);
+  const min=lo-margin,max=hi+margin,range=max-min;
+  const xspace=(w-padR-padL)/cs.length;
+  const py=p=>padT+(max-p)/range*(priceBottom-padT);
+  ctx.lineWidth=1;ctx.strokeStyle='#304761';ctx.fillStyle='#9bb3ca';ctx.font='11px system-ui';ctx.textAlign='left';
+  for (let i=0;i<=4;i++) {const y=padT+(priceBottom-padT)*i/4;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR+6,y);ctx.stroke();ctx.fillText(fmtPrice.format(max-(range*i/4)),w-padR+9,y+4);}
+  const maxVol=Math.max(1,...cs.map(x=>x.v));
+  cs.forEach((c,i)=>{
+    const x=padL+(i+.5)*xspace;
+    const rise=c.c>=c.o;
+    const color=rise?'#44d6a4':'#fb7b82';
+    ctx.strokeStyle=color;ctx.fillStyle=color;
+    ctx.beginPath();ctx.moveTo(x,py(c.h));ctx.lineTo(x,py(c.l));ctx.stroke();
+    const yy=Math.min(py(c.o),py(c.c)),bodyH=Math.max(1,Math.abs(py(c.o)-py(c.c)));
+    const bw=Math.max(1,Math.min(12,xspace*.65));
+    ctx.fillRect(x-bw/2,yy,bw,bodyH);
+    const volH=(c.v/maxVol)*Math.max(1,volBottom-volTop);
+    ctx.globalAlpha=.54;ctx.fillRect(x-bw/2,volBottom-volH,bw,volH);ctx.globalAlpha=1;
+  });
+  ctx.textAlign='left';ctx.fillStyle='#9bb3ca';ctx.font='11px system-ui';
+  for (let i=0;i<5;i++) {const idx=Math.min(cs.length-1,Math.round(i*(cs.length-1)/4));const x=padL+(idx+.5)*xspace;ctx.fillText(fmtShort.format(new Date(cs[idx].t)),Math.min(w-padR-40,x),h-6);}
+  ctx.fillText('VOLUME',padL,volTop-5);
+}
+function render() { updateValues(); drawChart(); }
+function escapeCsv(v) {return String(v);}
+function exportCsv() {
+  if (!candles.length) return;
+  const columns=['venue','market','symbol','interval','open_time_utc','open_ms','open','high','low','close','volume_btc','volume_usdt','is_closed','source','observed_at_utc'];
+  const lines=[columns.join(',')];
+  candles.forEach(c=>{
+    const vals=['Binance','Spot',SYMBOL,'1m',new Date(c.t).toISOString(),c.t,c.o,c.h,c.l,c.c,c.v,c.q,c.closed,c.source,new Date(c.seenAt).toISOString()];
+    lines.push(vals.map(escapeCsv).join(','));
+  });
+  const blob=new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='btc_spot_candles_'+new Date().toISOString().replace(/[:.]/g,'-')+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+  log('CSV de candles exportado: '+candles.length+' registros');
+}
+function runChecks() {
+  const saved=candles;
+  let passed=0,failed=0;
+  function check(name,fn) {try {if (!fn()) throw Error('falhou');passed++;}catch(err){failed++;log('Autoteste falhou: '+name);}}
+  const t=Date.UTC(2026,0,1,0,0,0);
+  const restRow=[t,'100','103','98','102','12',t+59999,'1205'];
+  const wsEvent={e:'kline',s:SYMBOL,E:t+10000,k:{t,i:'1m',o:'100',h:'104',l:'98',c:'103',v:'14',q:'1400',x:false}};
+  try {
+    candles=[];
+    check('REST válido',()=>{const r=normalizeRest(restRow,t+10000);return r.c===102&&r.v===12&&r.closed===false;});
+    check('REST rejeita preço inválido',()=>{try{normalizeRest([t,'100','90','98','102','12',t+59999,'1205']);return false;}catch(e){return true;}});
+    check('WS válido',()=>{const c=normalizeWs(wsEvent,t+11000);return c.c===103&&c.closed===false;});
+    check('ordenação e não duplicação',()=>{const a=normalizeRest(restRow,t+10000);const b={...a,t:t+MINUTE};addCandle(b);addCandle(a);addCandle(a);return candles.length===2&&candles[0].t===t;});
+    check('atualização WS tem prioridade',()=>{addCandle(normalizeWs(wsEvent,t+11000));addCandle(normalizeRest(restRow,t+12000));return candles[0].c===103;});
+    check('impede regressão WS antiga',()=>{const old=structuredClone(wsEvent);old.E=t+9000;old.k.c='101';addCandle(normalizeWs(old,t+13000));return candles[0].c===103;});
+  } finally {candles=saved;render();}
+  const result=passed+' verificações aprovadas; '+failed+' falhas.';
+  $('checkResult').textContent=result+(failed?' Verifique o histórico de eventos.':' Testes locais de consistência: OK.');
+  log('Autoteste: '+result);
+  return {passed,failed};
+}
+$('toggle').addEventListener('click',()=>desired?stop():start());
+$('refresh').addEventListener('click',()=>fetchHistory());
+$('export').addEventListener('click',exportCsv);
+$('check').addEventListener('click',runChecks);
+window.addEventListener('resize',drawChart);
+$('timezone').textContent=Intl.DateTimeFormat().resolvedOptions().timeZone||'Local do aparelho';
+setInterval(updateValues,1000);
+drawChart();
+start();
+</script>
+</body>
+</html>
